@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+export PATH   := $(shell sh -c "[ -d /opt/go ] && echo \"/opt/go/bin:${PATH}\" || echo \"${PATH}\"")
+export GOROOT := $(shell sh -c "[ -d /opt/go ] && echo /opt/go || echo")
+export GOPATH=/tmp
+
+%:
+	dh $@ 
+
+override_dh_builddeb:
+	dh_builddeb -- -Zgzip

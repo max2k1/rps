@@ -3,10 +3,13 @@ GOTOOLS = \
 
 # all builds binaries for all targets
 all: tools
-	@go build
+	@go build -o rps
+
+distclean: clean
 
 clean:
-	@rm rps || true
+	@rm rps 2>/dev/null || true
 
 tools:
-	go get -u -v $(GOTOOLS)
+	@go version
+	@go get -u -v $(GOTOOLS)

@@ -1,0 +1,14 @@
+Source: rps
+Section: unknown
+Priority: extra
+Maintainer: Maksim Kupriianov <maxk@yandex-team.ru>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.2
+Vcs-Git: https://github.com/max2k1/rps.git
+Vcs-Browser: https://github.com/max2k1/rps
+
+Package: rps
+Architecture: amd64
+Depends: ${misc:Depends}
+Description: RPS Meter
+ utility, that measures RPS from pipe
