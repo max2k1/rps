@@ -3,12 +3,12 @@ Section: unknown
 Priority: extra
 Maintainer: Maksim Kupriianov <maxk@yandex-team.ru>
 Build-Depends: debhelper (>= 8.0.0), golang
-Standards-Version: 3.9.2
+Standards-Version: 3.9.5
 Vcs-Git: https://github.com/max2k1/rps.git
 Vcs-Browser: https://github.com/max2k1/rps
 
 Package: rps
 Architecture: amd64
 Depends: ${misc:Depends}
-Description: RPS Meter
+Description: Rows-per-second (RPS) meter
  utility, that measures RPS from pipe
