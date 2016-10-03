@@ -119,11 +119,11 @@ func main() {
 			} else {
 				val1 = fmt.Sprintf("%s RPS", render_number.RenderInteger("#,###.", int64(n)))
 				val2 = fmt.Sprintf("%s bytes", render_number.RenderInteger("#,###.", int64(b)))
-				res = fmt.Sprintf("%s%s / %s", prefix, val1, val2)
+				res = fmt.Sprintf("%s/ %s / %s", prefix, val1, val2)
 			}
 
 			if flagOneLine {
-				res = fmt.Sprintf("\r                                                                                \r%s", res)
+				res = fmt.Sprintf("\r%20s\r%s", "", res)
 			} else {
 				res = fmt.Sprintf("%s\n", res)
 			}
@@ -182,8 +182,8 @@ func main() {
 
 	if !flagDontShowSummary {
 		fmt.Fprintln(os.Stderr, "= Summary: ========================")
-		fmt.Fprintf(os.Stderr, "Start:\t\t%s\n", tStart.Format("2006-01-02 15:04:05"))
-		fmt.Fprintf(os.Stderr, "Stop:\t\t%s\n", tStop.Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(os.Stderr, "%-16s%s\n", "Start:", tStart.Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(os.Stderr, "%-16s%s\n", "Stop:",   tStop.Format("2006-01-02 15:04:05"))
 		if flagNoFormat {
 			fmt.Fprintf(os.Stderr, "Elapsed, sec:\t%0.3f\n", float64(tElapsed.Seconds()))
 			fmt.Fprintf(os.Stderr, "Size, bytes:\t%d\n", nBytes)
@@ -200,19 +200,19 @@ func main() {
 				fmt.Fprintf(os.Stderr, "RPS  Max:\t%d\n", nMaxRPS)
 			}
 		} else {
-			fmt.Fprintf(os.Stderr, "Elapsed, sec:\t%19s\n", render_number.RenderFloat("#,###.###", float64(tElapsed.Seconds())))
-			fmt.Fprintf(os.Stderr, "Size, bytes:\t%19s\n", render_number.RenderInteger("#,###.", int64(nBytes)))
-			fmt.Fprintf(os.Stderr, "Speed, bps:\t%19s\n", render_number.RenderInteger("#,###.", int64(float64(nBytes)/tElapsed.Seconds())))
-			fmt.Fprintf(os.Stderr, "Rows:\t\t%19s\n", render_number.RenderInteger("#,###.", int64(nRows)))
+			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Elapsed, sec:", render_number.RenderFloat("#,###.###", float64(tElapsed.Seconds())))
+			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Size, bytes:", render_number.RenderInteger("#,###.", int64(nBytes)))
+			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Speed, bps:", render_number.RenderInteger("#,###.", int64(float64(nBytes)/tElapsed.Seconds())))
+			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Rows:", render_number.RenderInteger("#,###.", int64(nRows)))
 
 			if len(aRPS) > 0 {
-				fmt.Fprintf(os.Stderr, "RPS  Min:\t%19s\n", render_number.RenderInteger("#,###.", nMinRPS))
-				fmt.Fprintf(os.Stderr, "RPS  Avg:\t%19s\n", render_number.RenderFloat("#,###.", float64(nRows)/float64(len(aRPS))))
-				fmt.Fprintf(os.Stderr, "RPS 50th:\t%19s\n", render_number.RenderInteger("#,###.", n50RPS))
-				fmt.Fprintf(os.Stderr, "RPS 80th:\t%19s\n", render_number.RenderInteger("#,###.", n80RPS))
-				fmt.Fprintf(os.Stderr, "RPS 95th:\t%19s\n", render_number.RenderInteger("#,###.", n95RPS))
-				fmt.Fprintf(os.Stderr, "RPS 99th:\t%19s\n", render_number.RenderInteger("#,###.", n99RPS))
-				fmt.Fprintf(os.Stderr, "RPS  Max:\t%19s\n", render_number.RenderInteger("#,###.", nMaxRPS))
+				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Min:", render_number.RenderInteger("#,###.", nMinRPS))
+				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Avg:", render_number.RenderFloat("#,###.", float64(nRows)/float64(len(aRPS))))
+				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 50th:", render_number.RenderInteger("#,###.", n50RPS))
+				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 80th:", render_number.RenderInteger("#,###.", n80RPS))
+				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 95th:", render_number.RenderInteger("#,###.", n95RPS))
+				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 99th:", render_number.RenderInteger("#,###.", n99RPS))
+				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Max:", render_number.RenderInteger("#,###.", nMaxRPS))
 			}
 		}
 

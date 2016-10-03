@@ -8,43 +8,39 @@ When STDIN is closed, or program terminated by Ctrl-C, it prints summary informa
 Command-line arguments:
 ```
 $ rps -h
-Usage of rps:
+Usage of ./rps:
   -noformat
-    	Do not format values
+        Do not format values
   -nosummary
-    	Don't show summary at the end
+        Don't show summary at the end
   -notime
-    	Don't show timestamp on everysecond stats
+        Don't show timestamp on everysecond stats
   -oneline
-    	Print everysecond stats without newlines
+        Print everysecond stats without newlines
   -passthrough
-    	Passthrough incoming data to stdout
+        Passthrough incoming data to stdout
 ```
 
 Usage:
 ```
 $ tail -f /var/log/nginx/access.log | rps
-2016-10-01 19:12:58 205 RPS / 13,530 bytes
-2016-10-01 19:12:59 208 RPS / 13,728 bytes
-2016-10-01 19:13:00 208 RPS / 13,728 bytes
-2016-10-01 19:13:01 208 RPS / 13,728 bytes
-2016-10-01 19:13:02 207 RPS / 13,662 bytes
-2016-10-01 19:13:03 205 RPS / 13,530 bytes
-2016-10-01 19:13:04 208 RPS / 13,728 bytes
-2016-10-01 19:13:05 207 RPS / 13,662 bytes
-2016-10-01 19:13:06 199 RPS / 13,134 bytes
+2016-10-03 07:55:41 1,685 RPS / 2,783,074 bytes
+2016-10-03 07:55:42 2,114 RPS / 3,618,198 bytes
+...
+2016-10-03 08:21:56 3,290 RPS / 5,440,330 bytes
+2016-10-03 08:21:57 2,361 RPS / 3,989,635 bytes
 ^C= Summary: ========================
-Start:		2016-10-01 19:12:57
-Stop:		2016-10-01 19:13:06
-Elapsed, sec:	          9.043
-Bytes:		            122,958
-Speed, bps:	             13,596
-Lines:		              1,864
-MIN  RPS:	                199
-AVG  RPS:	                207
-50th RPS:	                207
-80th RPS:	                208
-95th RPS:	                208
-99th RPS:	                208
-MAX  RPS:	                208
+Start:            2016-10-03 07:55:40
+Stop:             2016-10-03 08:21:58
+Elapsed, sec:               1,577.990
+Size, bytes:           10,622,625,816
+Speed, bps:                 6,731,745
+Rows:                       6,786,319
+RPS  Min:                         913
+RPS  Avg:                       4,303
+RPS 50th:                       4,036
+RPS 80th:                       5,721
+RPS 95th:                       7,577
+RPS 99th:                       9,282
+RPS  Max:                      13,052
 ```
