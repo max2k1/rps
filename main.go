@@ -112,6 +112,9 @@ func main() {
 			prefix = ""
 			if !flagDontShowTime {
 				prefix = fmt.Sprintf("%s ", t.Format("2006-01-02 15:04:05"))
+				if !flagNoFormat {
+					prefix = fmt.Sprintf("%s| ", prefix)
+				}
 			}
 
 			if flagNoFormat {
@@ -119,7 +122,7 @@ func main() {
 			} else {
 				val1 = fmt.Sprintf("%s RPS", render_number.RenderInteger("#,###.", int64(n)))
 				val2 = fmt.Sprintf("%s bytes", render_number.RenderInteger("#,###.", int64(b)))
-				res = fmt.Sprintf("%s/ %s / %s", prefix, val1, val2)
+				res = fmt.Sprintf("%s%s | %s", prefix, val1, val2)
 			}
 
 			if flagOneLine {
@@ -183,7 +186,7 @@ func main() {
 	if !flagDontShowSummary {
 		fmt.Fprintln(os.Stderr, "= Summary: ========================")
 		fmt.Fprintf(os.Stderr, "%-16s%s\n", "Start:", tStart.Format("2006-01-02 15:04:05"))
-		fmt.Fprintf(os.Stderr, "%-16s%s\n", "Stop:",   tStop.Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(os.Stderr, "%-16s%s\n", "Stop:", tStop.Format("2006-01-02 15:04:05"))
 		if flagNoFormat {
 			fmt.Fprintf(os.Stderr, "Elapsed, sec:\t%0.3f\n", float64(tElapsed.Seconds()))
 			fmt.Fprintf(os.Stderr, "Size, bytes:\t%d\n", nBytes)
