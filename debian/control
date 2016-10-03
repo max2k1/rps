@@ -2,7 +2,7 @@ Source: rps
 Section: unknown
 Priority: extra
 Maintainer: Maksim Kupriianov <maxk@yandex-team.ru>
-Build-Depends: debhelper (>= 8.0.0)
+Build-Depends: debhelper (>= 8.0.0), golang
 Standards-Version: 3.9.2
 Vcs-Git: https://github.com/max2k1/rps.git
 Vcs-Browser: https://github.com/max2k1/rps
