@@ -1,3 +1,9 @@
+rps (0.0-10) trusty; urgency=medium
+
+  * Fix race condition with ticker thread
+
+ -- Maksim Kupriianov <maxk@yandex-team.ru>  Wed, 05 Oct 2016 14:54:41 +0300
+
 rps (0.0-9) trusty; urgency=medium
 
   * Fixed MinRPS again

@@ -96,7 +96,7 @@ func main() {
 	var nMaxRPS int64 = 0
 
 	if flagShowVersion {
-		fmt.Fprintf(os.Stderr, "RPS: Version %s\n", "0.0-9")
+		fmt.Fprintf(os.Stderr, "RPS: Version %s\n", "0.0-10")
 		return
 	}
 
@@ -104,7 +104,9 @@ func main() {
 
 	cInt := make(chan os.Signal, 2)
 	signal.Notify(cInt, os.Interrupt, syscall.SIGTERM)
-	cDone := make(chan error)
+	cStopTicker := make(chan bool)
+	cTickerStopped := make(chan bool)
+	cReadDone := make(chan error)
 	cQuit := make(chan bool)
 
 	var cTimeout <-chan time.Time
@@ -113,55 +115,66 @@ func main() {
 	}
 
 	// RPS ticker (rows per second)
-	ticker := time.NewTicker(time.Second)
 	go func() {
 		var prefix string = ""
 		var val1 string = ""
 		var val2 string = ""
 		var res string = ""
 
-		for t := range ticker.C {
-			n := atomic.SwapInt64(&nRowsLastSec, 0)
-			b := atomic.SwapInt64(&nBytesLastSec, 0)
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
 
-			mutex.Lock()
-			aObservations = append(aObservations, float64(n))
-			if 0 > nMinRPS || nMinRPS > n {
-				nMinRPS = n
-			}
-			if nMaxRPS < n {
-				nMaxRPS = n
-			}
-			mutex.Unlock()
+		for {
+			select {
+			// Exit on signal
+			case <-cStopTicker:
+				cTickerStopped <- true
+				return
+				// Print info every second
+			case t := <-ticker.C:
+				n := atomic.SwapInt64(&nRowsLastSec, 0)
+				b := atomic.SwapInt64(&nBytesLastSec, 0)
 
-			prefix = ""
-			if !flagDontShowTime {
-				prefix = fmt.Sprintf("%s ", t.Format("2006-01-02 15:04:05"))
-				if !flagNoFormat {
-					prefix = fmt.Sprintf("%s| ", prefix)
+				mutex.Lock()
+				aObservations = append(aObservations, float64(n))
+				if 0 > nMinRPS || nMinRPS > n {
+					nMinRPS = n
 				}
-			}
+				if nMaxRPS < n {
+					nMaxRPS = n
+				}
+				mutex.Unlock()
 
-			if flagNoFormat {
-				res = fmt.Sprintf("%s%d %d", prefix, n, b)
-			} else {
-				val1 = fmt.Sprintf("%s RPS", render_number.RenderInteger("#,###.", int64(n)))
-				val2 = fmt.Sprintf("%s bytes", render_number.RenderInteger("#,###.", int64(b)))
-				res = fmt.Sprintf("%s%s | %s", prefix, val1, val2)
-			}
+				prefix = ""
+				if !flagDontShowTime {
+					prefix = fmt.Sprintf("%s ", t.Format("2006-01-02 15:04:05"))
+					if !flagNoFormat {
+						prefix = fmt.Sprintf("%s| ", prefix)
+					}
+				}
 
-			if flagOneLine {
-				res = fmt.Sprintf("\r%20s\r%s", "", res)
-			} else {
-				res = fmt.Sprintf("%s\n", res)
-			}
+				if flagNoFormat {
+					res = fmt.Sprintf("%s%d %d", prefix, n, b)
+				} else {
+					val1 = fmt.Sprintf("%s RPS", render_number.RenderInteger("#,###.", int64(n)))
+					val2 = fmt.Sprintf("%s bytes", render_number.RenderInteger("#,###.", int64(b)))
+					res = fmt.Sprintf("%s%s | %s", prefix, val1, val2)
+				}
 
-			fmt.Fprint(os.Stderr, res)
+				if flagOneLine {
+					res = fmt.Sprintf("\r%20s\r%s", "", res)
+				} else {
+					res = fmt.Sprintf("%s\n", res)
+				}
+
+				fmt.Fprint(os.Stderr, res)
+			}
 		}
 	}()
 
-	tStart := time.Now()
+	// Read from STDIN
 	b := bufio.NewReader(os.Stdin)
+	tStart := time.Now()
 	go func() {
 		var bRow []byte
 		var err error = nil
@@ -202,14 +215,14 @@ func main() {
 
 			}
 		}
-		cDone <- err
+		cReadDone <- err
 	}()
 
 MainLoop:
 	for {
 		select {
 		// EOF or rows limit reached
-		case err := <-cDone:
+		case err := <-cReadDone:
 			if err != nil && err != io.EOF {
 				fmt.Fprintln(os.Stderr, "ERR:", err)
 			}
@@ -224,14 +237,16 @@ MainLoop:
 			break MainLoop
 		}
 	}
-	select {
-	case cQuit <- true:
-	default:
-	}
-	ticker.Stop()
-	tStop := time.Now()
 
+	// Ensure, that display thread is stopped
+	close(cStopTicker)
+	<-cTickerStopped
+
+	// Fix that time
+	tStop := time.Now()
 	tElapsed := tStop.Sub(tStart)
+
+	// Calculate statistics (reader thread may still be running, ex. in syscall)
 	mutex.Lock()
 	nObservations = int64(len(aObservations))
 	if nObservations > 0 {
