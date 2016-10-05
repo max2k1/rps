@@ -1,3 +1,9 @@
+rps (0.0-7) trusty; urgency=medium
+
+  * Fixed synchronization
+
+ -- Maksim Kupriianov <maxk@yandex-team.ru>  Wed, 05 Oct 2016 12:38:54 +0300
+
 rps (0.0-6) trusty; urgency=low
 
   * Add -timeout and -maxrows switches

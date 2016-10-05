@@ -94,7 +94,7 @@ func main() {
 	var n99RPS int64 = 0
 	var nMaxRPS int64 = 0
 
-	var once sync.Once
+	var mutex = &sync.Mutex{}
 
 	cInt := make(chan os.Signal, 2)
 	signal.Notify(cInt, os.Interrupt, syscall.SIGTERM)
@@ -118,15 +118,15 @@ func main() {
 			n := atomic.SwapInt64(&nRowsLastSec, 0)
 			b := atomic.SwapInt64(&nBytesLastSec, 0)
 
-			// Thread unsafe action!
-			once.Do(func() { aObservations = append(aObservations, float64(n)) })
-
+			mutex.Lock()
+			aObservations = append(aObservations, float64(n))
 			if 0 < nMinRPS || nMinRPS > n {
 				nMinRPS = n
 			}
 			if n > nMaxRPS {
 				nMaxRPS = n
 			}
+			mutex.Unlock()
 
 			prefix = ""
 			if !flagDontShowTime {
@@ -226,19 +226,19 @@ MainLoop:
 	tStop := time.Now()
 
 	tElapsed := tStop.Sub(tStart)
-	once.Do(func() {
-		nObservations = int64(len(aObservations))
-		if nObservations > 0 {
-			if flagOneLine {
-				fmt.Fprintln(os.Stderr, "")
-			}
-			sort.Float64s(aObservations)
-			n50RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.50))])
-			n80RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.80))])
-			n95RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.95))])
-			n99RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.99))])
+	mutex.Lock()
+	nObservations = int64(len(aObservations))
+	if nObservations > 0 {
+		if flagOneLine {
+			fmt.Fprintln(os.Stderr, "")
 		}
-	})
+		sort.Float64s(aObservations)
+		n50RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.50))])
+		n80RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.80))])
+		n95RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.95))])
+		n99RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.99))])
+	}
+	mutex.Unlock()
 
 	if !flagDontShowSummary {
 		fmt.Fprintln(os.Stderr, "= Summary: ========================")
@@ -251,6 +251,7 @@ MainLoop:
 			fmt.Fprintf(os.Stderr, "Rows:\t\t%d\n", atomic.LoadInt64(&nRows))
 
 			if nObservations > 0 {
+				mutex.Lock()
 				fmt.Fprintf(os.Stderr, "RPS  Min:\t%d\n", nMinRPS)
 				fmt.Fprintf(os.Stderr, "RPS  Avg:\t%0.0f\n", float64(atomic.LoadInt64(&nRows))/float64(nObservations))
 				fmt.Fprintf(os.Stderr, "RPS 50th:\t%d\n", n50RPS)
@@ -258,6 +259,7 @@ MainLoop:
 				fmt.Fprintf(os.Stderr, "RPS 95th:\t%d\n", n95RPS)
 				fmt.Fprintf(os.Stderr, "RPS 99th:\t%d\n", n99RPS)
 				fmt.Fprintf(os.Stderr, "RPS  Max:\t%d\n", nMaxRPS)
+				mutex.Unlock()
 			}
 		} else {
 			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Elapsed, sec:", render_number.RenderFloat("#,###.###", float64(tElapsed.Seconds())))
@@ -266,6 +268,7 @@ MainLoop:
 			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Rows:", render_number.RenderInteger("#,###.", atomic.LoadInt64(&nRows)))
 
 			if nObservations > 0 {
+				mutex.Lock()
 				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Min:", render_number.RenderInteger("#,###.", nMinRPS))
 				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Avg:", render_number.RenderFloat("#,###.", float64(atomic.LoadInt64(&nRows))/float64(nObservations)))
 				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 50th:", render_number.RenderInteger("#,###.", n50RPS))
@@ -273,6 +276,7 @@ MainLoop:
 				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 95th:", render_number.RenderInteger("#,###.", n95RPS))
 				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 99th:", render_number.RenderInteger("#,###.", n99RPS))
 				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Max:", render_number.RenderInteger("#,###.", nMaxRPS))
+				mutex.Unlock()
 			}
 		}
 	}
