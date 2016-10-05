@@ -96,7 +96,7 @@ func main() {
 	var nMaxRPS int64 = 0
 
 	if flagShowVersion {
-		fmt.Fprintf(os.Stderr, "RPS: Version %s\n", "0.0-8")
+		fmt.Fprintf(os.Stderr, "RPS: Version %s\n", "0.0-9")
 		return
 	}
 
@@ -126,10 +126,10 @@ func main() {
 
 			mutex.Lock()
 			aObservations = append(aObservations, float64(n))
-			if 0 < nMinRPS || nMinRPS > n {
+			if 0 > nMinRPS || nMinRPS > n {
 				nMinRPS = n
 			}
-			if n > nMaxRPS {
+			if nMaxRPS < n {
 				nMaxRPS = n
 			}
 			mutex.Unlock()
