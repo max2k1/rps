@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"sort"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -20,6 +21,8 @@ var flagOneLine bool
 var flagPassthrough bool
 var flagDontShowSummary bool
 var flagDontShowTime bool
+var flagMaxRows int64
+var flagTimeout int64
 
 func ReadRow(b *bufio.Reader) (line []byte, err error) {
 	// Use ReadSlice to look for array,
@@ -70,24 +73,38 @@ func init() {
 	flag.BoolVar(&flagPassthrough, "passthrough", false, "Passthrough incoming data to stdout")
 	flag.BoolVar(&flagDontShowSummary, "nosummary", false, "Don't show summary at the end")
 	flag.BoolVar(&flagDontShowTime, "notime", false, "Don't show timestamp on everysecond stats")
+	flag.Int64Var(&flagMaxRows, "maxrows", 0, "Exit after N rows were processed")
+	flag.Int64Var(&flagTimeout, "timeout", 0, "Exit after N seconds")
 	flag.Parse()
 }
 
 func main() {
-	var aRPS []float64 = make([]float64, 0, 600)
-	var bRow []byte
-	var err error = nil
+	var aObservations []float64 = make([]float64, 0, 600)
 	var nBytes int64 = 0
 	var nBytesLastSec int64 = 0
+	var nExitCode int = 0
+	var nObservations int64 = 0
 	var nRows int64 = 0
 	var nRowsLastSec int64 = 0
 
-	var nMinRPS int64 = -1
+	var nMinRPS int64 = 0
 	var n50RPS int64 = 0
 	var n80RPS int64 = 0
 	var n95RPS int64 = 0
 	var n99RPS int64 = 0
 	var nMaxRPS int64 = 0
+
+	var once sync.Once
+
+	cInt := make(chan os.Signal, 2)
+	signal.Notify(cInt, os.Interrupt, syscall.SIGTERM)
+	cDone := make(chan error)
+	cQuit := make(chan bool)
+
+	var cTimeout <-chan time.Time
+	if flagTimeout > 0 {
+		cTimeout = time.NewTimer(time.Duration(flagTimeout) * time.Second).C
+	}
 
 	// RPS ticker (rows per second)
 	ticker := time.NewTicker(time.Second)
@@ -101,8 +118,10 @@ func main() {
 			n := atomic.SwapInt64(&nRowsLastSec, 0)
 			b := atomic.SwapInt64(&nBytesLastSec, 0)
 
-			aRPS = append(aRPS, float64(n))
-			if n < nMinRPS || nMinRPS < 0 {
+			// Thread unsafe action!
+			once.Do(func() { aObservations = append(aObservations, float64(n)) })
+
+			if 0 < nMinRPS || nMinRPS > n {
 				nMinRPS = n
 			}
 			if n > nMaxRPS {
@@ -135,53 +154,91 @@ func main() {
 		}
 	}()
 
-	// Read data through pipe line-by-line (\n-separated flow)
-	cInt := make(chan os.Signal, 2)
-	signal.Notify(cInt, os.Interrupt, syscall.SIGTERM)
-	b := bufio.NewReader(os.Stdin)
 	tStart := time.Now()
-	for err == nil {
-		select {
-		case <-cInt:
-			fmt.Fprintln(os.Stderr, "")
-			break
-		default:
-			bRow, err = ReadRow(b)
-			if err != nil && err != io.EOF {
-				panic(err)
-				break
-			}
+	b := bufio.NewReader(os.Stdin)
+	go func() {
+		var bRow []byte
+		var err error = nil
 
-			size := len(bRow)
-			if size == 0 {
-				continue
-			}
+		// Read data through pipe line-by-line (\n-separated flow)
+	RL:
+		for err == nil {
+			select {
+			case <-cQuit:
+				break RL
+			default:
+				bRow, err = ReadRow(b)
 
-			nBytes += int64(size)
-			atomic.AddInt64(&nBytesLastSec, int64(size))
+				if err != nil && err != io.EOF {
+					break RL
+				}
 
-			nRows += 1
-			atomic.AddInt64(&nRowsLastSec, 1)
+				size := len(bRow)
+				if size == 0 {
+					continue RL
+				}
 
-			if flagPassthrough {
-				os.Stdout.Write(bRow)
+				atomic.AddInt64(&nBytes, int64(size))
+				atomic.AddInt64(&nBytesLastSec, int64(size))
+
+				atomic.AddInt64(&nRows, 1)
+				atomic.AddInt64(&nRowsLastSec, 1)
+
+				if flagPassthrough {
+					os.Stdout.Write(bRow)
+				}
+
+				if 0 < flagMaxRows && flagMaxRows <= atomic.LoadInt64(&nRows) {
+					// Rows limit reached
+					err = fmt.Errorf("Rows limit reached")
+					break RL
+				}
+
 			}
 		}
+		cDone <- err
+	}()
+
+MainLoop:
+	for {
+		select {
+		// EOF or rows limit reached
+		case err := <-cDone:
+			if err != nil && err != io.EOF {
+				fmt.Fprintln(os.Stderr, "ERR:", err)
+			}
+			break MainLoop
+		// Ctrl+C pressed
+		case <-cInt:
+			fmt.Fprintln(os.Stderr, "ERR: Interrupted")
+			break MainLoop
+		// Timeout expired
+		case <-cTimeout:
+			fmt.Fprintln(os.Stderr, "ERR: Timeout expired")
+			break MainLoop
+		}
 	}
-	tStop := time.Now()
+	select {
+	case cQuit <- true:
+	default:
+	}
 	ticker.Stop()
+	tStop := time.Now()
 
 	tElapsed := tStop.Sub(tStart)
-	if len(aRPS) > 0 {
-		if flagOneLine {
-			fmt.Fprintln(os.Stderr, "")
+	once.Do(func() {
+		nObservations = int64(len(aObservations))
+		if nObservations > 0 {
+			if flagOneLine {
+				fmt.Fprintln(os.Stderr, "")
+			}
+			sort.Float64s(aObservations)
+			n50RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.50))])
+			n80RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.80))])
+			n95RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.95))])
+			n99RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.99))])
 		}
-		sort.Float64s(aRPS)
-		n50RPS = int64(aRPS[int64(math.Floor(float64(len(aRPS))*0.50))])
-		n80RPS = int64(aRPS[int64(math.Floor(float64(len(aRPS))*0.80))])
-		n95RPS = int64(aRPS[int64(math.Floor(float64(len(aRPS))*0.95))])
-		n99RPS = int64(aRPS[int64(math.Floor(float64(len(aRPS))*0.99))])
-	}
+	})
 
 	if !flagDontShowSummary {
 		fmt.Fprintln(os.Stderr, "= Summary: ========================")
@@ -189,13 +246,13 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%-16s%s\n", "Stop:", tStop.Format("2006-01-02 15:04:05"))
 		if flagNoFormat {
 			fmt.Fprintf(os.Stderr, "Elapsed, sec:\t%0.3f\n", float64(tElapsed.Seconds()))
-			fmt.Fprintf(os.Stderr, "Size, bytes:\t%d\n", nBytes)
-			fmt.Fprintf(os.Stderr, "Speed, bps:\t%0.0f\n", float64(nBytes)/tElapsed.Seconds())
-			fmt.Fprintf(os.Stderr, "Rows:\t\t%d\n", nRows)
+			fmt.Fprintf(os.Stderr, "Size, bytes:\t%d\n", atomic.LoadInt64(&nBytes))
+			fmt.Fprintf(os.Stderr, "Speed, bps:\t%0.0f\n", float64(atomic.LoadInt64(&nBytes))/tElapsed.Seconds())
+			fmt.Fprintf(os.Stderr, "Rows:\t\t%d\n", atomic.LoadInt64(&nRows))
 
-			if len(aRPS) > 0 {
+			if nObservations > 0 {
 				fmt.Fprintf(os.Stderr, "RPS  Min:\t%d\n", nMinRPS)
-				fmt.Fprintf(os.Stderr, "RPS  Avg:\t%0.0f\n", float64(nRows)/float64(len(aRPS)))
+				fmt.Fprintf(os.Stderr, "RPS  Avg:\t%0.0f\n", float64(atomic.LoadInt64(&nRows))/float64(nObservations))
 				fmt.Fprintf(os.Stderr, "RPS 50th:\t%d\n", n50RPS)
 				fmt.Fprintf(os.Stderr, "RPS 80th:\t%d\n", n80RPS)
 				fmt.Fprintf(os.Stderr, "RPS 95th:\t%d\n", n95RPS)
@@ -204,13 +261,13 @@ func main() {
 			}
 		} else {
 			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Elapsed, sec:", render_number.RenderFloat("#,###.###", float64(tElapsed.Seconds())))
-			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Size, bytes:", render_number.RenderInteger("#,###.", int64(nBytes)))
-			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Speed, bps:", render_number.RenderInteger("#,###.", int64(float64(nBytes)/tElapsed.Seconds())))
-			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Rows:", render_number.RenderInteger("#,###.", int64(nRows)))
+			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Size, bytes:", render_number.RenderInteger("#,###.", atomic.LoadInt64(&nBytes)))
+			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Speed, bps:", render_number.RenderInteger("#,###.", int64(float64(atomic.LoadInt64(&nBytes))/tElapsed.Seconds())))
+			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Rows:", render_number.RenderInteger("#,###.", atomic.LoadInt64(&nRows)))
 
-			if len(aRPS) > 0 {
+			if nObservations > 0 {
 				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Min:", render_number.RenderInteger("#,###.", nMinRPS))
-				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Avg:", render_number.RenderFloat("#,###.", float64(nRows)/float64(len(aRPS))))
+				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Avg:", render_number.RenderFloat("#,###.", float64(atomic.LoadInt64(&nRows))/float64(nObservations)))
 				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 50th:", render_number.RenderInteger("#,###.", n50RPS))
 				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 80th:", render_number.RenderInteger("#,###.", n80RPS))
 				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 95th:", render_number.RenderInteger("#,###.", n95RPS))
@@ -218,6 +275,6 @@ func main() {
 				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Max:", render_number.RenderInteger("#,###.", nMaxRPS))
 			}
 		}
-
 	}
+	os.Exit(nExitCode)
 }

@@ -9,6 +9,8 @@ Command-line arguments:
 ```
 $ rps -h
 Usage of ./rps:
+  -maxrows int
+        Exit after N rows were processed
   -noformat
         Do not format values
   -nosummary
@@ -19,6 +21,8 @@ Usage of ./rps:
         Print everysecond stats without newlines
   -passthrough
         Passthrough incoming data to stdout
+  -timeout int
+        Exit after N seconds
 ```
 
 Usage:
