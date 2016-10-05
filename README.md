@@ -23,6 +23,8 @@ Usage of ./rps:
         Passthrough incoming data to stdout
   -timeout int
         Exit after N seconds
+  -version
+        Show version and exit
 ```
 
 Usage:

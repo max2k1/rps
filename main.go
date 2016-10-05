@@ -16,12 +16,13 @@ import (
 	"time"
 )
 
-var flagNoFormat bool
-var flagOneLine bool
-var flagPassthrough bool
 var flagDontShowSummary bool
 var flagDontShowTime bool
 var flagMaxRows int64
+var flagNoFormat bool
+var flagOneLine bool
+var flagPassthrough bool
+var flagShowVersion bool
 var flagTimeout int64
 
 func ReadRow(b *bufio.Reader) (line []byte, err error) {
@@ -68,11 +69,12 @@ R:
 }
 
 func init() {
+	flag.BoolVar(&flagDontShowSummary, "nosummary", false, "Don't show summary at the end")
+	flag.BoolVar(&flagDontShowTime, "notime", false, "Don't show timestamp on everysecond stats")
 	flag.BoolVar(&flagNoFormat, "noformat", false, "Do not format values")
 	flag.BoolVar(&flagOneLine, "oneline", false, "Print everysecond stats without newlines")
 	flag.BoolVar(&flagPassthrough, "passthrough", false, "Passthrough incoming data to stdout")
-	flag.BoolVar(&flagDontShowSummary, "nosummary", false, "Don't show summary at the end")
-	flag.BoolVar(&flagDontShowTime, "notime", false, "Don't show timestamp on everysecond stats")
+	flag.BoolVar(&flagShowVersion, "version", false, "Show version and exit")
 	flag.Int64Var(&flagMaxRows, "maxrows", 0, "Exit after N rows were processed")
 	flag.Int64Var(&flagTimeout, "timeout", 0, "Exit after N seconds")
 	flag.Parse()
@@ -82,17 +84,21 @@ func main() {
 	var aObservations []float64 = make([]float64, 0, 600)
 	var nBytes int64 = 0
 	var nBytesLastSec int64 = 0
-	var nExitCode int = 0
 	var nObservations int64 = 0
 	var nRows int64 = 0
 	var nRowsLastSec int64 = 0
 
-	var nMinRPS int64 = 0
+	var nMinRPS int64 = -1
 	var n50RPS int64 = 0
 	var n80RPS int64 = 0
 	var n95RPS int64 = 0
 	var n99RPS int64 = 0
 	var nMaxRPS int64 = 0
+
+	if flagShowVersion {
+		fmt.Fprintf(os.Stderr, "RPS: Version %s\n", "0.0-8")
+		return
+	}
 
 	var mutex = &sync.Mutex{}
 
@@ -237,6 +243,9 @@ MainLoop:
 		n80RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.80))])
 		n95RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.95))])
 		n99RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.99))])
+		if nMinRPS < 0 {
+			nMinRPS = 0
+		}
 	}
 	mutex.Unlock()
 
@@ -280,5 +289,4 @@ MainLoop:
 			}
 		}
 	}
-	os.Exit(nExitCode)
 }
