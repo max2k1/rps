@@ -25,7 +25,7 @@ var flagPassthrough bool
 var flagShowVersion bool
 var flagTimeout int64
 
-func ReadRow(b *bufio.Reader) (line []byte, err error) {
+func readRow(b *bufio.Reader) (line []byte, err error) {
 	// Use ReadSlice to look for array,
 	// accumulating full buffers.
 	var frag []byte
@@ -120,10 +120,10 @@ func main() {
 
 	// RPS ticker (rows per second)
 	go func() {
-		var prefix = ""
-		var val1 = ""
-		var val2 = ""
-		var res = ""
+		var prefix string
+		var val1 string
+		var val2 string
+		var res string
 
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
@@ -181,7 +181,7 @@ func main() {
 	tStart := time.Now()
 	go func() {
 		var bRow []byte
-		var err error = nil
+		var err error
 
 		// Read data through pipe line-by-line (\n-separated flow)
 	RL:
@@ -190,7 +190,7 @@ func main() {
 			case <-cQuit:
 				break RL
 			default:
-				bRow, err = ReadRow(b)
+				bRow, err = readRow(b)
 
 				if err != nil && err != io.EOF {
 					break RL
