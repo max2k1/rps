@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	render_number "github.com/max2k1/render_number"
+	"github.com/max2k1/render_number"
 	"io"
 	"math"
 	"os"
@@ -80,23 +80,27 @@ func init() {
 	flag.Parse()
 }
 
+func printf2Stderr(format string, a ...interface{}) {
+	_, _ = fmt.Fprintf(os.Stderr, format, a...)
+}
+
 func main() {
-	var aObservations []float64 = make([]float64, 0, 600)
-	var nBytes int64 = 0
-	var nBytesLastSec int64 = 0
-	var nObservations int64 = 0
-	var nRows int64 = 0
-	var nRowsLastSec int64 = 0
+	var aObservations = make([]float64, 0, 600)
+	var nBytes int64
+	var nBytesLastSec int64
+	var nObservations int64
+	var nRows int64
+	var nRowsLastSec int64
 
 	var nMinRPS int64 = -1
-	var n50RPS int64 = 0
-	var n80RPS int64 = 0
-	var n95RPS int64 = 0
-	var n99RPS int64 = 0
-	var nMaxRPS int64 = 0
+	var n50RPS int64
+	var n80RPS int64
+	var n95RPS int64
+	var n99RPS int64
+	var nMaxRPS int64
 
 	if flagShowVersion {
-		fmt.Fprintf(os.Stderr, "RPS: Version %s\n", "0.0-10")
+		printf2Stderr("RPS: Version %s\n", "0.0-10")
 		return
 	}
 
@@ -116,10 +120,10 @@ func main() {
 
 	// RPS ticker (rows per second)
 	go func() {
-		var prefix string = ""
-		var val1 string = ""
-		var val2 string = ""
-		var res string = ""
+		var prefix = ""
+		var val1 = ""
+		var val2 = ""
+		var res = ""
 
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
@@ -167,7 +171,7 @@ func main() {
 					res = fmt.Sprintf("%s\n", res)
 				}
 
-				fmt.Fprint(os.Stderr, res)
+				_, _ = fmt.Fprint(os.Stderr, res)
 			}
 		}
 	}()
@@ -204,12 +208,12 @@ func main() {
 				atomic.AddInt64(&nRowsLastSec, 1)
 
 				if flagPassthrough {
-					os.Stdout.Write(bRow)
+					_, _ = os.Stdout.Write(bRow)
 				}
 
 				if 0 < flagMaxRows && flagMaxRows <= atomic.LoadInt64(&nRows) {
 					// Rows limit reached
-					err = fmt.Errorf("Rows limit reached")
+					err = fmt.Errorf("rows limit reached")
 					break RL
 				}
 
@@ -224,16 +228,16 @@ MainLoop:
 		// EOF or rows limit reached
 		case err := <-cReadDone:
 			if err != nil && err != io.EOF {
-				fmt.Fprintln(os.Stderr, "ERR:", err)
+				_, _ = fmt.Fprintln(os.Stderr, "ERR:", err)
 			}
 			break MainLoop
 		// Ctrl+C pressed
 		case <-cInt:
-			fmt.Fprintln(os.Stderr, "ERR: Interrupted")
+			_, _ = fmt.Fprintln(os.Stderr, "ERR: Interrupted")
 			break MainLoop
 		// Timeout expired
 		case <-cTimeout:
-			fmt.Fprintln(os.Stderr, "ERR: Timeout expired")
+			_, _ = fmt.Fprintln(os.Stderr, "ERR: Timeout expired")
 			break MainLoop
 		}
 	}
@@ -251,7 +255,7 @@ MainLoop:
 	nObservations = int64(len(aObservations))
 	if nObservations > 0 {
 		if flagOneLine {
-			fmt.Fprintln(os.Stderr, "")
+			_, _ = fmt.Fprintln(os.Stderr, "")
 		}
 		sort.Float64s(aObservations)
 		n50RPS = int64(aObservations[int64(math.Floor(float64(nObservations)*0.50))])
@@ -265,41 +269,41 @@ MainLoop:
 	mutex.Unlock()
 
 	if !flagDontShowSummary {
-		fmt.Fprintln(os.Stderr, "= Summary: ========================")
-		fmt.Fprintf(os.Stderr, "%-16s%s\n", "Start:", tStart.Format("2006-01-02 15:04:05"))
-		fmt.Fprintf(os.Stderr, "%-16s%s\n", "Stop:", tStop.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintln(os.Stderr, "= Summary: ========================")
+		printf2Stderr("%-16s%s\n", "Start:", tStart.Format("2006-01-02 15:04:05"))
+		printf2Stderr("%-16s%s\n", "Stop:", tStop.Format("2006-01-02 15:04:05"))
 		if flagNoFormat {
-			fmt.Fprintf(os.Stderr, "Elapsed, sec:\t%0.3f\n", float64(tElapsed.Seconds()))
-			fmt.Fprintf(os.Stderr, "Size, bytes:\t%d\n", atomic.LoadInt64(&nBytes))
-			fmt.Fprintf(os.Stderr, "Speed, bps:\t%0.0f\n", float64(atomic.LoadInt64(&nBytes))/tElapsed.Seconds())
-			fmt.Fprintf(os.Stderr, "Rows:\t\t%d\n", atomic.LoadInt64(&nRows))
+			printf2Stderr("Elapsed, sec:\t%0.3f\n", float64(tElapsed.Seconds()))
+			printf2Stderr("Size, bytes:\t%d\n", atomic.LoadInt64(&nBytes))
+			printf2Stderr("Speed, bps:\t%0.0f\n", float64(atomic.LoadInt64(&nBytes))/tElapsed.Seconds())
+			printf2Stderr("Rows:\t\t%d\n", atomic.LoadInt64(&nRows))
 
 			if nObservations > 0 {
 				mutex.Lock()
-				fmt.Fprintf(os.Stderr, "RPS  Min:\t%d\n", nMinRPS)
-				fmt.Fprintf(os.Stderr, "RPS  Avg:\t%0.0f\n", float64(atomic.LoadInt64(&nRows))/float64(nObservations))
-				fmt.Fprintf(os.Stderr, "RPS 50th:\t%d\n", n50RPS)
-				fmt.Fprintf(os.Stderr, "RPS 80th:\t%d\n", n80RPS)
-				fmt.Fprintf(os.Stderr, "RPS 95th:\t%d\n", n95RPS)
-				fmt.Fprintf(os.Stderr, "RPS 99th:\t%d\n", n99RPS)
-				fmt.Fprintf(os.Stderr, "RPS  Max:\t%d\n", nMaxRPS)
+				printf2Stderr("RPS  Min:\t%d\n", nMinRPS)
+				printf2Stderr("RPS  Avg:\t%0.0f\n", float64(atomic.LoadInt64(&nRows))/float64(nObservations))
+				printf2Stderr("RPS 50th:\t%d\n", n50RPS)
+				printf2Stderr("RPS 80th:\t%d\n", n80RPS)
+				printf2Stderr("RPS 95th:\t%d\n", n95RPS)
+				printf2Stderr("RPS 99th:\t%d\n", n99RPS)
+				printf2Stderr("RPS  Max:\t%d\n", nMaxRPS)
 				mutex.Unlock()
 			}
 		} else {
-			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Elapsed, sec:", render_number.RenderFloat("#,###.###", float64(tElapsed.Seconds())))
-			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Size, bytes:", render_number.RenderInteger("#,###.", atomic.LoadInt64(&nBytes)))
-			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Speed, bps:", render_number.RenderInteger("#,###.", int64(float64(atomic.LoadInt64(&nBytes))/tElapsed.Seconds())))
-			fmt.Fprintf(os.Stderr, "%-16s%19s\n", "Rows:", render_number.RenderInteger("#,###.", atomic.LoadInt64(&nRows)))
+			printf2Stderr("%-16s%19s\n", "Elapsed, sec:", render_number.RenderFloat("#,###.###", float64(tElapsed.Seconds())))
+			printf2Stderr("%-16s%19s\n", "Size, bytes:", render_number.RenderInteger("#,###.", atomic.LoadInt64(&nBytes)))
+			printf2Stderr("%-16s%19s\n", "Speed, bps:", render_number.RenderInteger("#,###.", int64(float64(atomic.LoadInt64(&nBytes))/tElapsed.Seconds())))
+			printf2Stderr("%-16s%19s\n", "Rows:", render_number.RenderInteger("#,###.", atomic.LoadInt64(&nRows)))
 
 			if nObservations > 0 {
 				mutex.Lock()
-				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Min:", render_number.RenderInteger("#,###.", nMinRPS))
-				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Avg:", render_number.RenderFloat("#,###.", float64(atomic.LoadInt64(&nRows))/float64(nObservations)))
-				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 50th:", render_number.RenderInteger("#,###.", n50RPS))
-				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 80th:", render_number.RenderInteger("#,###.", n80RPS))
-				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 95th:", render_number.RenderInteger("#,###.", n95RPS))
-				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS 99th:", render_number.RenderInteger("#,###.", n99RPS))
-				fmt.Fprintf(os.Stderr, "%-16s%19s\n", "RPS  Max:", render_number.RenderInteger("#,###.", nMaxRPS))
+				printf2Stderr("%-16s%19s\n", "RPS  Min:", render_number.RenderInteger("#,###.", nMinRPS))
+				printf2Stderr("%-16s%19s\n", "RPS  Avg:", render_number.RenderFloat("#,###.", float64(atomic.LoadInt64(&nRows))/float64(nObservations)))
+				printf2Stderr("%-16s%19s\n", "RPS 50th:", render_number.RenderInteger("#,###.", n50RPS))
+				printf2Stderr("%-16s%19s\n", "RPS 80th:", render_number.RenderInteger("#,###.", n80RPS))
+				printf2Stderr("%-16s%19s\n", "RPS 95th:", render_number.RenderInteger("#,###.", n95RPS))
+				printf2Stderr("%-16s%19s\n", "RPS 99th:", render_number.RenderInteger("#,###.", n99RPS))
+				printf2Stderr("%-16s%19s\n", "RPS  Max:", render_number.RenderInteger("#,###.", nMaxRPS))
 				mutex.Unlock()
 			}
 		}
