@@ -2,7 +2,6 @@
 
 [![Godoc Reference](https://godoc.org/github.com/max2k1/rps?status.svg)](http://godoc.org/github.com/max2k1/rps)
 [![Build Status](https://travis-ci.org/max2k1/rps.svg?branch=master)](https://travis-ci.org/max2k1/rps)
-[![Coverage Status](https://coveralls.io/repos/github/max2k1/rps/badge.svg?branch=master)](https://coveralls.io/github/max2k1/rps?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/max2k1/rps)](https://goreportcard.com/report/max2k1/rps)
 
 Utility to measure RPS (rows, or requests per second) and BPS for incoming from pipe flow.
